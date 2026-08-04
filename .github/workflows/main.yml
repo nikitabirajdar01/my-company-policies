@@ -12,25 +12,43 @@ jobs:
       - name: Checkout Repository Code
         uses: actions/checkout@v4
 
-      - name: Install Markdown Converter
-        run: sudo apt-get install -y pandoc
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-      - name: Prepare JSON Payload
+      - name: Install Dependencies
+        run: pip install markdown python-frontmatter
+
+      - name: Parse Markdown and Build Payload
         id: build_payload
         run: |
-          # 1. Convert Markdown file to HTML string
-          HTML_CONTENT=$(pandoc -f markdown -t html security-policy.md)
-          
-          # 2. Define your metadata fields
-          POLICY_NUMBER="POL001002"
-          POLICY_NAME="Global Information Security Policy"
-          
-          # 3. Use jq to safely escape strings and create the final JSON payload
-          jq -n \
-            --arg num "$POLICY_NUMBER" \
-            --arg name "$POLICY_NAME" \
-            --arg text "$HTML_CONTENT" \
-            '{number: $num, name: $name, policy_text: $text}' > payload.json
+          python -c "
+          import frontmatter
+          import markdown
+          import json
+
+          # Load markdown securely
+          post = frontmatter.load('security-policy.md')
+          policy_number = post.get('Number', '').strip()
+          policy_name = post.get('Name', '').strip()
+
+          # Convert tables and core elements cleanly to standard HTML structures
+          html_content = markdown.markdown(post.content, extensions=['tables'])
+
+          # Fix the GitHub asset URL so ServiceNow can visually fetch the image file
+          html_content = html_content.replace('/blob/main/', '/raw/main/')
+
+          # Format cleanly into a strict JSON payload mapping
+          payload = {
+              'number': policy_number,
+              'name': policy_name,
+              'policy_text': html_content
+          }
+
+          with open('payload.json', 'w', encoding='utf-8') as f:
+              json.dump(payload, f, ensure_ascii=False, indent=2)
+          "
 
       - name: Send API Request to ServiceNow
         run: |
