@@ -18,21 +18,25 @@ jobs:
       - name: Prepare JSON Payload
         id: build_payload
         run: |
-          # 1. Convert Markdown to HTML using GitHub Flavored Markdown (gfm) parser
-          RAW_HTML=$(pandoc -f gfm -t html security-policy.md)
+          # 1. Strip the front matter out completely so it doesn't break table structures
+          # This removes everything between the first two '---' markers inclusive
+          sed -1,/\-\-\-/d;/\-\-\-/d' security-policy.md > pure-policy.md
+
+          # 2. Convert pure markdown to HTML using GitHub Flavored Markdown (gfm) specs
+          RAW_HTML=$(pandoc -f gfm -t html pure-policy.md)
           
-          # 2. Add an inline <style> block so tables have clean borders inside ServiceNow
-          TABLE_STYLE="<style>table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #dddddd; text-align: left; padding: 8px; } th { background-color: #f2f2f2; }</style>"
+          # 3. Add explicit styles so ServiceNow displays table lines and borders clearly
+          TABLE_STYLE="<style>table { border-collapse: collapse; width: 100%; margin: 16px 0; font-family: sans-serif; } th, td { border: 1px solid #cccccc; text-align: left; padding: 10px; } th { background-color: #f5f5f5; font-weight: bold; }</style>"
           HTML_CONTENT="${TABLE_STYLE}${RAW_HTML}"
 
-          # 3. Fix the GitHub asset URL so images display natively
+          # 4. Correct the public image URL from /blob/ view to /raw/ engine delivery
           HTML_CONTENT=$(echo "$HTML_CONTENT" | sed 's|/blob/main/|/raw/main/|g')
           
-          # 4. Define your metadata fields
+          # 5. Establish metadata values 
           POLICY_NUMBER="POL0010217"
           POLICY_NAME="Change Management - yes working"
           
-          # 5. Build safe payload using jq
+          # 6. Safely wrap everything into payload.json with jq to escape quotes and newlines
           jq -n \
             --arg num "$POLICY_NUMBER" \
             --arg name "$POLICY_NAME" \
@@ -46,4 +50,5 @@ jobs:
           -u "github.integration:Policy_Sync_2026" \
           --data-binary @payload.json \
           https://dev391524.service-now.com//api/sn_compliance/test_policy/update
+          
           
