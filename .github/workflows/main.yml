@@ -18,15 +18,14 @@ jobs:
       - name: Prepare JSON Payload
         id: build_payload
         run: |
-          # 1. Strip the front matter out completely so it doesn't break table structures
-          # This removes everything between the first two '---' markers inclusive
-          sed -1,/\-\-\-/d;/\-\-\-/d' security-policy.md > pure-policy.md
+          # 1. Strip front matter cleanly so it does not break formatting
+          sed '1,/\-\-\-/d;/\-\-\-/d' security-policy.md > pure-policy.md
 
-          # 2. Convert pure markdown to HTML using GitHub Flavored Markdown (gfm) specs
+          # 2. Convert pure markdown to HTML using GitHub Flavored Markdown (gfm)
           RAW_HTML=$(pandoc -f gfm -t html pure-policy.md)
           
-          # 3. Add explicit styles so ServiceNow displays table lines and borders clearly
-          TABLE_STYLE="<style>table { border-collapse: collapse; width: 100%; margin: 16px 0; font-family: sans-serif; } th, td { border: 1px solid #cccccc; text-align: left; padding: 10px; } th { background-color: #f5f5f5; font-weight: bold; }</style>"
+          # 3. Add explicit styles for tables and cap the max width of images to 100%
+          TABLE_STYLE="<style>table { border-collapse: collapse; width: 100%; margin: 16px 0; font-family: sans-serif; } th, td { border: 1px solid #cccccc; text-align: left; padding: 10px; } th { background-color: #f5f5f5; font-weight: bold; } img { max-width: 100%; height: auto; display: block; margin: 15px 0; }</style>"
           HTML_CONTENT="${TABLE_STYLE}${RAW_HTML}"
 
           # 4. Correct the public image URL from /blob/ view to /raw/ engine delivery
@@ -50,5 +49,7 @@ jobs:
           -u "github.integration:Policy_Sync_2026" \
           --data-binary @payload.json \
           https://dev391524.service-now.com//api/sn_compliance/test_policy/update
+
+          
           
           
