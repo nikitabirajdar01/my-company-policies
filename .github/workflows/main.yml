@@ -1,0 +1,41 @@
+name: Sync Policy to ServiceNow
+ 
+on:
+  push:
+    paths:
+      - 'security-policy.md'
+
+jobs:
+  send-to-servicenow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: Install Markdown Converter
+        run: sudo apt-get install -y pandoc
+
+      - name: Prepare JSON Payload
+        id: build_payload
+        run: |
+          # 1. Convert Markdown file to HTML string
+          HTML_CONTENT=$(pandoc -f markdown -t html security-policy.md)
+          
+          # 2. Define your metadata fields
+          POLICY_NUMBER="POL001002"
+          POLICY_NAME="Global Information Security Policy"
+          
+          # 3. Use jq to safely escape strings and create the final JSON payload
+          jq -n \
+            --arg num "$POLICY_NUMBER" \
+            --arg name "$POLICY_NAME" \
+            --arg text "$HTML_CONTENT" \
+            '{number: $num, name: $name, policy_text: $text}' > payload.json
+
+      - name: Send API Request to ServiceNow
+        run: |
+          curl -X POST \
+          -H "Content-Type: application/json" \
+          -u "github.integration:Policy_Sync_2026" \
+          --data-binary @payload.json \
+          https://dev391524.service-now.com/api/sn_compliance/github_policy_integration/update
