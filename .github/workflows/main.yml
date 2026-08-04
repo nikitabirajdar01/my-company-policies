@@ -12,35 +12,60 @@ jobs:
       - name: Checkout Repository Code
         uses: actions/checkout@v4
 
-      - name: Install Markdown Converter
-        run: sudo apt-get install -y pandoc
+      - name: Set up Python Engine
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-      - name: Prepare JSON Payload
-        id: build_payload
+      - name: Install Compilers
+        run: pip install markdown python-frontmatter
+
+      - name: Compile Document and Dynamically Parse Fields
+        id: parse_data
         run: |
-          # 1. Strip front matter cleanly so it does not break formatting
-          sed '1,/\-\-\-/d;/\-\-\-/d' security-policy.md > pure-policy.md
+          python -c "
+          import frontmatter
+          import markdown
+          import json
 
-          # 2. Convert pure markdown to HTML using GitHub Flavored Markdown (gfm)
-          RAW_HTML=$(pandoc -f gfm -t html pure-policy.md)
+          # 1. Parse front matter cleanly (Separates metadata from document content)
+          post = frontmatter.load('security-policy.md')
           
-          # 3. Add explicit styles for tables and cap the max width of images to 100%
-          TABLE_STYLE="<style>table { border-collapse: collapse; width: 100%; margin: 16px 0; font-family: sans-serif; } th, td { border: 1px solid #cccccc; text-align: left; padding: 10px; } th { background-color: #f5f5f5; font-weight: bold; } img { max-width: 100%; height: auto; display: block; margin: 15px 0; }</style>"
-          HTML_CONTENT="${TABLE_STYLE}${RAW_HTML}"
+          # 2. Dynamically pull properties directly out of the markdown file header
+          policy_number = post.get('Number', '').strip()
+          policy_name = post.get('Name', '').strip()
 
-          # 4. Correct the public image URL from /blob/ view to /raw/ engine delivery
-          HTML_CONTENT=$(echo "$HTML_CONTENT" | sed 's|/blob/main/|/raw/main/|g')
-          
-          # 5. Establish metadata values 
-          POLICY_NUMBER="POL0010217"
-          POLICY_NAME="Change Management - yes working"
-          
-          # 6. Safely wrap everything into payload.json with jq to escape quotes and newlines
-          jq -n \
-            --arg num "$POLICY_NUMBER" \
-            --arg name "$POLICY_NAME" \
-            --arg text "$HTML_CONTENT" \
-            '{number: $num, name: $name, policy_text: $text}' > payload.json
+          # Fallbacks if fields are missing in front-matter
+          if not policy_number: policy_number = 'POL0010217'
+          if not policy_name: policy_name = 'Change Management'
+
+          # 3. Convert markdown content to structured HTML tables natively
+          html_content = markdown.markdown(post.content, extensions=['tables'])
+
+          # 4. Inject explicit CSS rules for clear visible table structures and auto-sized images
+          inline_styles = (
+              '<style>'
+              'table { border-collapse: collapse; width: 100%; margin: 16px 0; font-family: sans-serif; } '
+              'th, td { border: 1px solid #cccccc; text-align: left; padding: 10px; } '
+              'th { background-color: #f5f5f5; font-weight: bold; } '
+              'img { max-width: 100%; height: auto; display: block; margin: 15px 0; }'
+              '</style>'
+              )
+          final_html = inline_styles + html_content
+
+          # 5. Correct the public image URL from /blob/ view to /raw/ engine delivery
+          final_html = final_html.replace('/blob/main/', '/raw/main/')
+
+          # 6. Build the dynamic outbound JSON structure
+          payload = {
+              'number': policy_number,
+              'name': policy_name,
+              'policy_text': final_html
+          }
+
+          with open('payload.json', 'w', encoding='utf-8') as f:
+              json.dump(payload, f, ensure_ascii=False, indent=2)
+          "
 
       - name: Send API Request to ServiceNow
         run: |
@@ -49,6 +74,8 @@ jobs:
           -u "github.integration:Policy_Sync_2026" \
           --data-binary @payload.json \
           https://dev391524.service-now.com//api/sn_compliance/test_policy/update
+
+          
 
           
           
