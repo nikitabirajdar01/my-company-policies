@@ -13,4 +13,7 @@ Name: Operating System Access Management policy
 ### 2. Network Segmentation Topology
 ![Network Architecture Layout](https://github.com/nikitabirajdar01/my-company-policies/blob/main/images/image-1.png)
 
+### 3. Link
+https://learning.servicenow.com/now/lxp/home
+
 
