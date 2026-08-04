@@ -1,6 +1,6 @@
 ---
 Number: POL0010217
-Name: Change Management - Working Fine Finally
+Name: Change Management
 ---
 
 ### 1. Classification of Approved Remote Access Systems
