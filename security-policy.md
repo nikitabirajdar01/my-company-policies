@@ -11,6 +11,6 @@ Name: Change Management - Working Fine Finally
 | Approved Personal Device | Virtual Desktop Infrastructure (VDI) | Every 24 Hours |
 
 ### 2. Network Segmentation Topology
-![Network Architecture Layout](https://github.com/nikitabirajdar01/my-company-policies/blob/main/images/image.png)
+![Network Architecture Layout](https://github.com/nikitabirajdar01/my-company-policies/blob/main/images/image-1.png)
 
 
