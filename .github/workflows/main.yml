@@ -38,4 +38,4 @@ jobs:
           -H "Content-Type: application/json" \
           -u "github.integration:Policy_Sync_2026" \
           --data-binary @payload.json \
-          https://dev391524.service-now.com/api/sn_compliance/github_policy_integration/update
+          https://dev391524.service-now.com//api/sn_compliance/test_policy/update
