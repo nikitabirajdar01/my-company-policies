@@ -12,43 +12,32 @@ jobs:
       - name: Checkout Repository Code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
+      - name: Install Markdown Converter
+        run: sudo apt-get install -y pandoc
 
-      - name: Install Dependencies
-        run: pip install markdown python-frontmatter
-
-      - name: Parse Markdown and Build Payload
+      - name: Prepare JSON Payload
         id: build_payload
         run: |
-          python -c "
-          import frontmatter
-          import markdown
-          import json
+          # 1. Convert Markdown to HTML using GitHub Flavored Markdown (gfm) parser
+          RAW_HTML=$(pandoc -f gfm -t html security-policy.md)
+          
+          # 2. Add an inline <style> block so tables have clean borders inside ServiceNow
+          TABLE_STYLE="<style>table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #dddddd; text-align: left; padding: 8px; } th { background-color: #f2f2f2; }</style>"
+          HTML_CONTENT="${TABLE_STYLE}${RAW_HTML}"
 
-          # Load markdown securely
-          post = frontmatter.load('security-policy.md')
-          policy_number = post.get('Number', '').strip()
-          policy_name = post.get('Name', '').strip()
-
-          # Convert tables and core elements cleanly to standard HTML structures
-          html_content = markdown.markdown(post.content, extensions=['tables'])
-
-          # Fix the GitHub asset URL so ServiceNow can visually fetch the image file
-          html_content = html_content.replace('/blob/main/', '/raw/main/')
-
-          # Format cleanly into a strict JSON payload mapping
-          payload = {
-              'number': policy_number,
-              'name': policy_name,
-              'policy_text': html_content
-          }
-
-          with open('payload.json', 'w', encoding='utf-8') as f:
-              json.dump(payload, f, ensure_ascii=False, indent=2)
-          "
+          # 3. Fix the GitHub asset URL so images display natively
+          HTML_CONTENT=$(echo "$HTML_CONTENT" | sed 's|/blob/main/|/raw/main/|g')
+          
+          # 4. Define your metadata fields
+          POLICY_NUMBER="POL0010217"
+          POLICY_NAME="Change Management - yes working"
+          
+          # 5. Build safe payload using jq
+          jq -n \
+            --arg num "$POLICY_NUMBER" \
+            --arg name "$POLICY_NAME" \
+            --arg text "$HTML_CONTENT" \
+            '{number: $num, name: $name, policy_text: $text}' > payload.json
 
       - name: Send API Request to ServiceNow
         run: |
@@ -57,3 +46,4 @@ jobs:
           -u "github.integration:Policy_Sync_2026" \
           --data-binary @payload.json \
           https://dev391524.service-now.com//api/sn_compliance/test_policy/update
+          
