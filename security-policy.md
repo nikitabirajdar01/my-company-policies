@@ -1,6 +1,6 @@
 ---
 Number: POL0010191
-Name: Operating System Access Management policy - Testing Please ignore
+Name: Operating System Access Management policy
 ---
 
 ### 1. Classification of Approved Remote Access Systems
